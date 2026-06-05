@@ -1,0 +1,68 @@
+name: "Terraform Validate"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      working_directory:
+        required: false
+        type: string
+        default: "."
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      TF_BACKEND_RESOURCE_GROUP:
+        required: true
+      TF_BACKEND_STORAGE_ACCOUNT:
+        required: true
+      TF_BACKEND_CONTAINER:
+        required: true
+
+jobs:
+  validate:
+    name: "Validate (${{ inputs.environment }})"
+    runs-on: [self-hosted, linux, terraform]
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init (restore state)
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate" \
+            -input=false \
+            -reconfigure
+
+      # ── Format check (fail if unformatted files found) ────────────────────
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive -diff
+
+      # ── Validate configuration syntax and internal consistency ────────────
+      - name: Terraform Validate
+        run: terraform validate -no-color

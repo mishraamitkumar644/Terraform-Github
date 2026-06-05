@@ -1,0 +1,47 @@
+name: "Terrascan"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      working_directory:
+        required: false
+        type: string
+        default: "."
+
+jobs:
+  terrascan:
+    name: "Terrascan (${{ inputs.environment }})"
+    runs-on: [self-hosted, linux, terraform]
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Run Terrascan for IaC compliance ──────────────────────────────────
+      # -t terraform   : scan Terraform IaC
+      # -o json        : machine-readable output for report publishing
+      # --non-recursive: scan current directory only (remove if nested modules needed)
+      - name: Terrascan
+        run: |
+          terrascan scan \
+            -i terraform \
+            -o json \
+            --output-file terrascan-report.json \
+            --non-recursive \
+            || true    # Remove '|| true' to hard-fail on violations
+
+      # ── Upload compliance report artifact ─────────────────────────────────
+      - name: Upload Terrascan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terrascan-report-${{ inputs.environment }}
+          path: ${{ inputs.working_directory }}/terrascan-report.json
+          if-no-files-found: ignore
+          retention-days: 7

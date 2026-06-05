@@ -1,0 +1,84 @@
+name: "Terraform Plan"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      working_directory:
+        required: false
+        type: string
+        default: "."
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      TF_BACKEND_RESOURCE_GROUP:
+        required: true
+      TF_BACKEND_STORAGE_ACCOUNT:
+        required: true
+      TF_BACKEND_CONTAINER:
+        required: true
+
+jobs:
+  plan:
+    name: "Plan (${{ inputs.environment }})"
+    runs-on: [self-hosted, linux, terraform]
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate" \
+            -input=false \
+            -reconfigure
+
+      # ── Generate plan with environment-specific var file ──────────────────
+      # tfplan is a binary artifact; it will be uploaded below and reused
+      # in the apply job to guarantee the exact same changes are applied
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var-file="environments/${{ inputs.environment }}.tfvars" \
+            -out=tfplan \
+            -input=false \
+            -no-color \
+            2>&1 | tee plan-output.txt
+
+      # ── Upload tfplan binary for downstream jobs ──────────────────────────
+      # Artifact is named with environment + run ID to avoid collisions
+      - name: Upload tfplan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.environment }}-${{ github.run_id }}
+          path: |
+            ${{ inputs.working_directory }}/tfplan
+            ${{ inputs.working_directory }}/plan-output.txt
+          retention-days: 5
+          if-no-files-found: error
