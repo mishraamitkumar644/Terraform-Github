@@ -27,7 +27,7 @@ on:
 jobs:
   plan:
     name: "Plan (${{ inputs.environment }})"
-    runs-on: [self-hosted, linux, terraform]
+    runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     defaults:
       run:
