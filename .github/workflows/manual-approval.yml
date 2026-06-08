@@ -11,7 +11,7 @@ on:
 jobs:
   approval:
     name: "Awaiting Approval (${{ inputs.environment }})"
-    runs-on: [self-hosted, linux, terraform]
+    runs-on: ubuntu-latest
     # ── KEY FIX: environment is dynamic, not hardcoded to 'prod' ──────────
     # Configure required reviewers per environment in:
     #   GitHub → Settings → Environments → <env> → Required reviewers
