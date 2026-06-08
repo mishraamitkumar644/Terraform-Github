@@ -1,0 +1,100 @@
+name: "Terraform Plan"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      working_directory:
+        required: false
+        type: string
+        default: "."
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      TF_BACKEND_RESOURCE_GROUP:
+        required: true
+      TF_BACKEND_STORAGE_ACCOUNT:
+        required: true
+      TF_BACKEND_CONTAINER:
+        required: true
+
+jobs:
+  plan:
+    name: "Plan (${{ inputs.environment }})"
+    runs-on: [self-hosted, linux, terraform]
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+          terraform_wrapper: false   # wrapper intercepts exit codes — must be false
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate" \
+            -input=false \
+            -reconfigure
+
+      # ── Generate plan ─────────────────────────────────────────────────────
+      # Exit code semantics:
+      #   0 = no changes
+      #   1 = error          → fail
+      #   2 = changes found  → normal, do NOT fail
+      - name: Terraform Plan
+        id: plan
+        run: |
+          set +e
+          terraform plan \
+            -var-file="environments/${{ inputs.environment }}.tfvars" \
+            -out=tfplan \
+            -input=false \
+            -no-color \
+            2>&1 | tee plan-output.txt
+          PLAN_EXIT=${PIPESTATUS[0]}
+          echo "plan_exit_code=${PLAN_EXIT}" >> $GITHUB_OUTPUT
+          if [ "$PLAN_EXIT" -eq 1 ]; then
+            echo "::error::terraform plan failed with exit code 1. Check output above."
+            exit 1
+          fi
+          if [ "$PLAN_EXIT" -eq 0 ]; then
+            echo "::notice::No changes detected in plan."
+          fi
+          if [ "$PLAN_EXIT" -eq 2 ]; then
+            echo "::notice::Changes detected in plan. Proceeding to artifact upload."
+          fi
+
+      # ── Upload tfplan binary + plan output for downstream jobs ────────────
+      - name: Upload tfplan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.environment }}-${{ github.run_id }}
+          path: |
+            ${{ inputs.working_directory }}/tfplan
+            ${{ inputs.working_directory }}/plan-output.txt
+          retention-days: 5
+          if-no-files-found: error

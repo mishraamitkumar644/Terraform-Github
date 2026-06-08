@@ -1,0 +1,129 @@
+name: "Terraform Apply"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      working_directory:
+        required: false
+        type: string
+        default: "."
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      TF_BACKEND_RESOURCE_GROUP:
+        required: true
+      TF_BACKEND_STORAGE_ACCOUNT:
+        required: true
+      TF_BACKEND_CONTAINER:
+        required: true
+
+jobs:
+  apply:
+    name: "Apply (${{ inputs.environment }})"
+    runs-on: [self-hosted, linux, terraform]
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
+    steps:
+      # ── Safety guard: abort immediately if not on main ────────────────────
+      - name: Branch guard — must be main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Apply is only permitted from the main branch."
+            echo "  Current branch: ${{ github.ref }}"
+            echo "  Expected      : refs/heads/main"
+            exit 1
+          fi
+          echo "Branch check passed: ${{ github.ref }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+          terraform_wrapper: false   # Must be false — wrapper breaks exit code capture
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate" \
+            -input=false \
+            -reconfigure
+
+      # ── Download the approved (post-approval) tfplan ──────────────────────
+      - name: Download approved tfplan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-approved-${{ inputs.environment }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}
+
+      # ── Verify artifact before apply ──────────────────────────────────────
+      - name: Verify tfplan before apply
+        run: |
+          if [ ! -f "tfplan" ]; then
+            echo "::error::Approved tfplan not found. Cannot apply."
+            exit 1
+          fi
+          echo "Applying plan:"
+          ls -lh tfplan
+
+      # ── Apply — capture exit code correctly with pipefail ─────────────────
+      - name: Terraform Apply
+        run: |
+          set -o pipefail
+          terraform apply \
+            -input=false \
+            -no-color \
+            tfplan \
+            2>&1 | tee apply-output.txt
+
+      # ── Upload apply output for audit trail ──────────────────────────────
+      - name: Upload apply output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apply-output-${{ inputs.environment }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}/apply-output.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+      # ── Post apply summary ────────────────────────────────────────────────
+      - name: Apply Summary
+        if: always()
+        run: |
+          echo "## Terraform Apply — \`${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Applied by | \`${{ github.actor }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run ID | \`${{ github.run_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary>Apply Output</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat apply-output.txt >> $GITHUB_STEP_SUMMARY || echo "(output not available)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
