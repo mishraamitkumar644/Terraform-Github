@@ -1,4 +1,8 @@
 name: "Setup Terraform"
+# NOTE: Ye file ab pipeline mein USE NAHI HOTI.
+# terraform-ci-cd.yml se setup job remove kar diya gaya hai.
+# Har reusable workflow apna khud ka azure/login aur terraform setup karta hai.
+# Ye file reference ke liye preserve ki gayi hai — delete kar sakte ho.
 
 on:
   workflow_call:
@@ -6,7 +10,6 @@ on:
       environment:
         required: true
         type: string
-        description: "Target environment (dev | qa | prod)"
       working_directory:
         required: false
         type: string
@@ -33,11 +36,8 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
-          terraform_wrapper: false   # wrapper must be false to preserve exit codes in plan/apply
+          terraform_wrapper: false
 
-      # ── OIDC: Authenticate to Azure (no long-lived secrets stored) ────────
-      # Federated Credential subject for env-scoped jobs:
-      #   repo:<org>/<repo>:environment:<env>
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:

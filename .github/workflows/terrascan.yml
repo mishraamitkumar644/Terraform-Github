@@ -23,10 +23,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Run Terrascan for IaC compliance ──────────────────────────────────
-      # -t terraform   : scan Terraform IaC
-      # -o json        : machine-readable output for report publishing
-      # --non-recursive: scan current directory only (remove if nested modules needed)
+      - name: Install Terrascan
+        run: |
+          curl -sL -o /usr/local/bin/terrascan \
+            https://github.com/tenable/terrascan/releases/latest/download/terrascan_Linux_x86_64.tar.gz \
+            | tar -xz -C /usr/local/bin terrascan
+          chmod +x /usr/local/bin/terrascan
+          terrascan version
+
       - name: Terrascan
         run: |
           terrascan scan \
@@ -34,9 +38,8 @@ jobs:
             -o json \
             --output-file terrascan-report.json \
             --non-recursive \
-            || true    # Remove '|| true' to hard-fail on violations
+            || true
 
-      # ── Upload compliance report artifact ─────────────────────────────────
       - name: Upload Terrascan report
         if: always()
         uses: actions/upload-artifact@v4

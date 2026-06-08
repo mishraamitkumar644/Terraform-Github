@@ -60,10 +60,8 @@ jobs:
             -input=false \
             -reconfigure
 
-      # ── Format check (fail if unformatted files found) ────────────────────
       - name: Terraform Format Check
         run: terraform fmt -check -recursive -diff
 
-      # ── Validate configuration syntax and internal consistency ────────────
       - name: Terraform Validate
         run: terraform validate -no-color

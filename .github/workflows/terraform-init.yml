@@ -50,9 +50,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # ── Terraform Init with remote Azure backend ──────────────────────────
-      # Backend key is namespaced per environment — each env has its own state:
-      #   dev/terraform.tfstate | qa/terraform.tfstate | prod/terraform.tfstate
       - name: Terraform Init
         run: |
           terraform init \
@@ -63,6 +60,5 @@ jobs:
             -input=false \
             -reconfigure
 
-      # ── Verify init succeeded ─────────────────────────────────────────────
       - name: Verify Terraform Init
         run: terraform version

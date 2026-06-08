@@ -6,16 +6,12 @@ on:
       environment:
         required: true
         type: string
-        description: "Environment to gate approval for (maps to a GitHub Environment with required reviewers)"
+        description: "Environment to gate approval for"
 
 jobs:
   approval:
     name: "Awaiting Approval (${{ inputs.environment }})"
     runs-on: ubuntu-latest
-    # ── KEY FIX: environment is dynamic, not hardcoded to 'prod' ──────────
-    # Configure required reviewers per environment in:
-    #   GitHub → Settings → Environments → <env> → Required reviewers
-    # The job will pause here until a reviewer approves or rejects.
     environment: ${{ inputs.environment }}
 
     steps:
@@ -27,4 +23,3 @@ jobs:
           echo "  Approved by : ${{ github.actor }}"
           echo "  Run ID      : ${{ github.run_id }}"
           echo "========================================"
-          echo "Proceeding to download plan and apply..."

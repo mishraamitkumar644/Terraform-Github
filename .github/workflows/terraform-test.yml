@@ -50,7 +50,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Terraform Init (for test modules)
+      - name: Terraform Init
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
@@ -60,7 +60,6 @@ jobs:
             -input=false \
             -reconfigure
 
-      # ── Run Terraform native tests and capture output ─────────────────────
       - name: Terraform Test
         run: |
           set -o pipefail
@@ -70,7 +69,6 @@ jobs:
             -verbose \
             2>&1 | tee terraform-test-output.txt
 
-      # ── Upload test OUTPUT (not source files) ─────────────────────────────
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

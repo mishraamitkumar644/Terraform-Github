@@ -23,20 +23,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Initialize TFLint with plugins (reads .tflint.hcl if present) ────
+      - name: Install TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
       - name: TFLint Init
         run: tflint --init
 
-      # ── Run lint checks across all Terraform files ────────────────────────
-      # Note: tflint does NOT accept --var-file. Variable values are not
-      # needed for linting — tflint checks rules, not runtime values.
+      # tflint does not accept --var-file — it checks rules, not runtime values
       - name: TFLint Run
         run: |
           tflint \
             --format compact \
             --recursive
 
-      # ── Upload lint report as artifact ────────────────────────────────────
       - name: Upload TFLint report
         if: always()
         uses: actions/upload-artifact@v4

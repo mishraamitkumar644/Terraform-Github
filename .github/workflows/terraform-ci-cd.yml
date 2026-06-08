@@ -18,33 +18,23 @@ on:
         type: string
 
 permissions:
-  id-token: write       # Required for OIDC token to authenticate with Azure
-  contents: read        # Required to checkout repository code
-  pull-requests: write  # Required to post plan comments on PRs
-  actions: read         # Required to download artifacts from workflow runs
+  id-token: write
+  contents: read
+  pull-requests: write
+  actions: read
 
 jobs:
 
-  # ── 1. SETUP: Install Terraform & Azure login ────────────────────────────
-  setup:
-    name: "Setup"
-    uses: ./.github/workflows/setup-terraform.yml
-    with:
-      environment: ${{ inputs.environment }}
-      working_directory: ${{ inputs.working_directory }}
-    secrets: inherit
-
-  # ── 2. INIT: Terraform init with environment backend ─────────────────────
+  # ── 1. INIT ───────────────────────────────────────────────────────────────
   init:
     name: "Init"
-    needs: setup
     uses: ./.github/workflows/terraform-init.yml
     with:
       environment: ${{ inputs.environment }}
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 3. VALIDATE: fmt check + validate ────────────────────────────────────
+  # ── 2. VALIDATE ───────────────────────────────────────────────────────────
   validate:
     name: "Validate"
     needs: init
@@ -54,7 +44,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 4a. TFLINT: Linting ──────────────────────────────────────────────────
+  # ── 3a. TFLINT ───────────────────────────────────────────────────────────
   tflint:
     name: "TFLint"
     needs: validate
@@ -64,7 +54,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 4b. TFSEC: Security scan ─────────────────────────────────────────────
+  # ── 3b. TFSEC ────────────────────────────────────────────────────────────
   tfsec:
     name: "TFSec"
     needs: validate
@@ -74,7 +64,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 4c. TERRASCAN: Compliance scan ───────────────────────────────────────
+  # ── 3c. TERRASCAN ────────────────────────────────────────────────────────
   terrascan:
     name: "Terrascan"
     needs: validate
@@ -84,7 +74,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 4d. TERRAFORM TEST: Unit / integration tests ─────────────────────────
+  # ── 3d. TERRAFORM TEST ───────────────────────────────────────────────────
   test:
     name: "Terraform Test"
     needs: validate
@@ -94,7 +84,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 5. PLAN: Generate tfplan binary artifact ──────────────────────────────
+  # ── 4. PLAN ──────────────────────────────────────────────────────────────
   plan:
     name: "Plan"
     needs: [tflint, tfsec, terrascan, test]
@@ -104,7 +94,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 6. PLAN → JSON: Convert binary plan to JSON for policy evaluation ─────
+  # ── 5. PLAN TO JSON ──────────────────────────────────────────────────────
   plan-to-json:
     name: "Plan to JSON"
     needs: plan
@@ -114,7 +104,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 7. OPA: Policy-as-code validation on tfplan.json ─────────────────────
+  # ── 6. OPA ───────────────────────────────────────────────────────────────
   opa:
     name: "OPA Policy Validation"
     needs: plan-to-json
@@ -124,7 +114,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 8. PUBLISH: Post plan + OPA results as PR comment / summary ──────────
+  # ── 7. PUBLISH ───────────────────────────────────────────────────────────
   publish:
     name: "Publish Results"
     needs: opa
@@ -134,7 +124,7 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 9. MANUAL APPROVAL: Human gate before apply ──────────────────────────
+  # ── 8. MANUAL APPROVAL ───────────────────────────────────────────────────
   approval:
     name: "Manual Approval"
     needs: publish
@@ -143,7 +133,7 @@ jobs:
       environment: ${{ inputs.environment }}
     secrets: inherit
 
-  # ── 10. DOWNLOAD: Retrieve approved tfplan artifact ───────────────────────
+  # ── 9. DOWNLOAD PLAN ─────────────────────────────────────────────────────
   download:
     name: "Download Plan"
     needs: approval
@@ -153,11 +143,10 @@ jobs:
       working_directory: ${{ inputs.working_directory }}
     secrets: inherit
 
-  # ── 11. APPLY: Apply only on main branch ─────────────────────────────────
+  # ── 10. APPLY ────────────────────────────────────────────────────────────
   apply:
     name: "Apply"
     needs: download
-    # Guard: apply runs ONLY when triggered from the main branch
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/terraform-apply.yml
     with:

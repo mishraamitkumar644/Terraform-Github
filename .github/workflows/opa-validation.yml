@@ -23,16 +23,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Download tfplan JSON generated in previous job ────────────────────
+      - name: Install OPA
+        run: |
+          curl -sL -o /usr/local/bin/opa \
+            https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x /usr/local/bin/opa
+          opa version
+
       - name: Download tfplan JSON artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan-json-${{ inputs.environment }}-${{ github.run_id }}
           path: ${{ inputs.working_directory }}
 
-      # ── Run OPA policy evaluation ─────────────────────────────────────────
-      # policies/ dir is always at repo root ($GITHUB_WORKSPACE/policies)
-      # regardless of working_directory — so we always use the absolute path.
       - name: OPA Evaluate - deny rules
         run: |
           DENY_OUTPUT=$(opa eval \
@@ -46,12 +49,11 @@ jobs:
 
           DENY_COUNT=$(echo "$DENY_OUTPUT" | jq 'if type == "array" then length else 0 end')
           if [ "$DENY_COUNT" -gt 0 ]; then
-            echo "::error::OPA policy violations found ($DENY_COUNT violations). Review the deny output above."
+            echo "::error::OPA policy violations found ($DENY_COUNT). Review above."
             exit 1
           fi
-          echo "OPA validation passed. No policy violations."
+          echo "OPA validation passed."
 
-      # ── Evaluate warn rules (non-blocking) ───────────────────────────────
       - name: OPA Evaluate - warn rules
         run: |
           WARN_OUTPUT=$(opa eval \
@@ -62,11 +64,10 @@ jobs:
 
           WARN_COUNT=$(echo "$WARN_OUTPUT" | jq 'if type == "array" then length else 0 end')
           if [ "$WARN_COUNT" -gt 0 ]; then
-            echo "::warning::OPA policy warnings ($WARN_COUNT). Review before apply:"
+            echo "::warning::OPA warnings ($WARN_COUNT):"
             echo "$WARN_OUTPUT"
           fi
 
-      # ── Save OPA results for publish job ─────────────────────────────────
       - name: Save OPA results
         if: always()
         run: |
@@ -74,7 +75,8 @@ jobs:
             --data "$GITHUB_WORKSPACE/policies" \
             --input tfplan.json \
             --format json \
-            'data.terraform' > opa-results.json || echo '{"error":"opa eval failed"}' > opa-results.json
+            'data.terraform' > opa-results.json \
+            || echo '{"error":"opa eval failed"}' > opa-results.json
 
       - name: Upload OPA results artifact
         if: always()

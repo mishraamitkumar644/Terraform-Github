@@ -41,7 +41,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
-          terraform_wrapper: false   # wrapper intercepts exit codes — must be false
+          terraform_wrapper: false
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -60,11 +60,7 @@ jobs:
             -input=false \
             -reconfigure
 
-      # ── Generate plan ─────────────────────────────────────────────────────
-      # Exit code semantics:
-      #   0 = no changes
-      #   1 = error          → fail
-      #   2 = changes found  → normal, do NOT fail
+      # Exit codes: 0=no changes, 1=error, 2=changes found (normal)
       - name: Terraform Plan
         id: plan
         run: |
@@ -78,17 +74,16 @@ jobs:
           PLAN_EXIT=${PIPESTATUS[0]}
           echo "plan_exit_code=${PLAN_EXIT}" >> $GITHUB_OUTPUT
           if [ "$PLAN_EXIT" -eq 1 ]; then
-            echo "::error::terraform plan failed with exit code 1. Check output above."
+            echo "::error::terraform plan failed."
             exit 1
           fi
           if [ "$PLAN_EXIT" -eq 0 ]; then
-            echo "::notice::No changes detected in plan."
+            echo "::notice::No changes detected."
           fi
           if [ "$PLAN_EXIT" -eq 2 ]; then
-            echo "::notice::Changes detected in plan. Proceeding to artifact upload."
+            echo "::notice::Changes detected. Proceeding."
           fi
 
-      # ── Upload tfplan binary + plan output for downstream jobs ────────────
       - name: Upload tfplan artifact
         uses: actions/upload-artifact@v4
         with:

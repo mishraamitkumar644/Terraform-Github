@@ -60,25 +60,21 @@ jobs:
             -input=false \
             -reconfigure
 
-      # ── Download the binary tfplan from the plan job ──────────────────────
       - name: Download tfplan artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ inputs.environment }}-${{ github.run_id }}
           path: ${{ inputs.working_directory }}
 
-      # ── Convert binary plan → structured JSON for OPA evaluation ─────────
       - name: Convert tfplan to JSON
         run: terraform show -json tfplan > tfplan.json
 
-      # ── Validate the JSON is well-formed ──────────────────────────────────
       - name: Validate JSON output
         run: |
           jq 'keys' tfplan.json
-          echo "Plan JSON generated successfully. Resource changes:"
+          echo "Resource changes:"
           jq '.resource_changes | length' tfplan.json
 
-      # ── Upload tfplan.json for OPA job ────────────────────────────────────
       - name: Upload tfplan JSON artifact
         uses: actions/upload-artifact@v4
         with:
