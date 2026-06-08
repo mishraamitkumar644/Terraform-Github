@@ -30,6 +30,7 @@ provider "azurerm" {
   #   ARM_SUBSCRIPTION_ID
   # No need to repeat them here — provider picks them up from env.
   use_oidc = true
+  use_cli  = false
 }
 
 # ── Resource Group ────────────────────────────────────────────
