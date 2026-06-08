@@ -14,7 +14,7 @@ resource "azurerm_storage_account" "this" {
   https_traffic_only_enabled      = true
   min_tls_version                 = "TLS1_2"
   allow_nested_items_to_be_public = false
-  shared_access_key_enabled       = false   # Force Azure AD auth only
+  shared_access_key_enabled       = false # Force Azure AD auth only
   blob_properties {
     delete_retention_policy {
       days = var.blob_delete_retention_days
