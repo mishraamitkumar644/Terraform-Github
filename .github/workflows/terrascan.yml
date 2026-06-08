@@ -23,22 +23,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Terrascan
-        run: |
-          curl -sL -o /usr/local/bin/terrascan \
-            https://github.com/tenable/terrascan/releases/latest/download/terrascan_Linux_x86_64.tar.gz \
-            | tar -xz -C /usr/local/bin terrascan
-          chmod +x /usr/local/bin/terrascan
-          terrascan version
-
       - name: Terrascan
-        run: |
-          terrascan scan \
-            -i terraform \
-            -o json \
-            --output-file terrascan-report.json \
-            --non-recursive \
-            || true
+        uses: tenable/terrascan-action@main
+        with:
+          iac_type: terraform
+          iac_dir: ${{ inputs.working_directory }}
+          non_recursive: true
+          sarif_upload: false
+        continue-on-error: true
 
       - name: Upload Terrascan report
         if: always()

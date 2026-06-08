@@ -31,7 +31,6 @@ jobs:
       - name: TFLint Init
         run: tflint --init
 
-      # tflint does not accept --var-file — it checks rules, not runtime values
       - name: TFLint Run
         run: |
           tflint \
