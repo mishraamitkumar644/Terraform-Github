@@ -6,8 +6,7 @@
 terraform {
   required_version = "~> 1.7"
 
-  required_providers {
-   
+  required_providers {   
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
@@ -32,6 +31,7 @@ provider "azurerm" {
   # No need to repeat them here — provider picks them up from env.
   use_oidc = true
   use_cli  = false
+  storage_use_azuread = true
 }
 
 # ── Resource Group ────────────────────────────────────────────
