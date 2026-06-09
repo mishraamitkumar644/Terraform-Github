@@ -22,7 +22,7 @@ resource "azurerm_storage_account" "this" {
   identity {
     type = "SystemAssigned"
   }
-  
+
   blob_properties {
     delete_retention_policy {
       days = var.blob_delete_retention_days
