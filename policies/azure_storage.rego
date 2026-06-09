@@ -1,73 +1,57 @@
 package terraform
 
-import future.keywords.if
-import future.keywords.in
-
-# ── Helper: collect all storage_account resources from plan ──────────────────
-storage_accounts[resource] if {
-  resource := input.resource_changes[_]
-  resource.type == "azurerm_storage_account"
-  resource.change.actions[_] in ["create", "update"]
-}
-
 # ── DENY: HTTPS must be enforced ─────────────────────────────────────────────
-deny[msg] if {
-  sa := storage_accounts[_]
-  not sa.change.after.https_traffic_only_enabled
-  msg := sprintf(
-    "Storage Account '%s' must have HTTPS-only traffic enabled.",
-    [sa.address]
-  )
+deny[msg] {
+  rc := input.resource_changes[_]
+  rc.type == "azurerm_storage_account"
+  rc.change.actions[_] == "create"
+  not rc.change.after.https_traffic_only_enabled
+  msg := sprintf("Storage Account '%s' must have HTTPS-only enabled", [rc.address])
 }
 
-# ── DENY: TLS version must be 1.2 or higher ──────────────────────────────────
-deny[msg] if {
-  sa := storage_accounts[_]
-  sa.change.after.min_tls_version != "TLS1_2"
-  msg := sprintf(
-    "Storage Account '%s' must use min TLS version TLS1_2. Found: '%s'",
-    [sa.address, sa.change.after.min_tls_version]
-  )
+# ── DENY: TLS version must be TLS1_2 ─────────────────────────────────────────
+deny[msg] {
+  rc := input.resource_changes[_]
+  rc.type == "azurerm_storage_account"
+  rc.change.actions[_] == "create"
+  rc.change.after.min_tls_version != "TLS1_2"
+  msg := sprintf("Storage Account '%s' must use TLS1_2, found: '%s'", [rc.address, rc.change.after.min_tls_version])
 }
 
 # ── DENY: Public blob access must be disabled ─────────────────────────────────
-deny[msg] if {
-  sa := storage_accounts[_]
-  sa.change.after.allow_nested_items_to_be_public == true
-  msg := sprintf(
-    "Storage Account '%s' must not allow public blob access.",
-    [sa.address]
-  )
+deny[msg] {
+  rc := input.resource_changes[_]
+  rc.type == "azurerm_storage_account"
+  rc.change.actions[_] == "create"
+  rc.change.after.allow_nested_items_to_be_public == true
+  msg := sprintf("Storage Account '%s' must not allow public blob access", [rc.address])
 }
 
 # ── DENY: Required tags missing ──────────────────────────────────────────────
-deny[msg] if {
-  sa := storage_accounts[_]
+deny[msg] {
+  rc := input.resource_changes[_]
+  rc.type == "azurerm_storage_account"
+  rc.change.actions[_] == "create"
   required_tags := ["environment", "project", "owner"]
   tag := required_tags[_]
-  not sa.change.after.tags[tag]
-  msg := sprintf(
-    "Storage Account '%s' is missing required tag: '%s'",
-    [sa.address, tag]
-  )
+  not rc.change.after.tags[tag]
+  msg := sprintf("Storage Account '%s' missing required tag: '%s'", [rc.address, tag])
 }
 
 # ── WARN: Shared access key should be disabled ────────────────────────────────
-warn[msg] if {
-  sa := storage_accounts[_]
-  sa.change.after.shared_access_key_enabled == true
-  msg := sprintf(
-    "Storage Account '%s': shared access key is enabled. Prefer Azure AD auth.",
-    [sa.address]
-  )
+warn[msg] {
+  rc := input.resource_changes[_]
+  rc.type == "azurerm_storage_account"
+  rc.change.actions[_] == "create"
+  rc.change.after.shared_access_key_enabled == true
+  msg := sprintf("Storage Account '%s': shared access key enabled, prefer Azure AD auth", [rc.address])
 }
 
-# ── WARN: Replication type for prod ──────────────────────────────────────────
-warn[msg] if {
-  sa := storage_accounts[_]
-  sa.change.after.account_replication_type == "LRS"
-  msg := sprintf(
-    "Storage Account '%s' uses LRS replication. Consider GRS/ZRS for production.",
-    [sa.address]
-  )
+# ── WARN: LRS replication ─────────────────────────────────────────────────────
+warn[msg] {
+  rc := input.resource_changes[_]
+  rc.type == "azurerm_storage_account"
+  rc.change.actions[_] == "create"
+  rc.change.after.account_replication_type == "LRS"
+  msg := sprintf("Storage Account '%s' uses LRS. Consider GRS/ZRS for production", [rc.address])
 }
