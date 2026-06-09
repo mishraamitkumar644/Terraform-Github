@@ -12,7 +12,7 @@ jobs:
   approval:
     name: "Awaiting Approval (${{ inputs.environment }})"
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: approver
 
     steps:
       - name: Approval checkpoint
