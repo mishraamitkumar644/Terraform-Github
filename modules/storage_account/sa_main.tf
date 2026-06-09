@@ -18,7 +18,8 @@ resource "azurerm_storage_account" "this" {
   min_tls_version                 = "TLS1_2"
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = false # Force Azure AD auth only
-
+  default_to_oauth_authentication = true
+  
   identity {
     type = "SystemAssigned"
   }
