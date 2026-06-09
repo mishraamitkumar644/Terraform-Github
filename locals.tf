@@ -4,9 +4,9 @@
 
 locals {
   common_tags = {
-    Environment = var.environment
-    Project     = var.project
-    Owner       = var.owner
-    ManagedBy   = "Terraform"
+    environment = var.environment
+    project     = var.project
+    owner       = var.owner
+    managedBy   = "Terraform"
   }
 }
