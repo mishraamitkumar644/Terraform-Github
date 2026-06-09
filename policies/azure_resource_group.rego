@@ -1,7 +1,10 @@
 package terraform
 
+import future.keywords.if
+import future.keywords.contains
+
 # ── DENY: Required tags missing ──────────────────────────────────────────────
-deny[msg] {
+deny contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_resource_group"
   rc.change.actions[_] == "create"
@@ -12,7 +15,7 @@ deny[msg] {
 }
 
 # ── DENY: Location must be approved ──────────────────────────────────────────
-deny[msg] {
+deny contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_resource_group"
   rc.change.actions[_] == "create"

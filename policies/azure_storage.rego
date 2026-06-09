@@ -1,7 +1,10 @@
 package terraform
 
+import future.keywords.if
+import future.keywords.contains
+
 # ── DENY: HTTPS must be enforced ─────────────────────────────────────────────
-deny[msg] {
+deny contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_storage_account"
   rc.change.actions[_] == "create"
@@ -10,7 +13,7 @@ deny[msg] {
 }
 
 # ── DENY: TLS version must be TLS1_2 ─────────────────────────────────────────
-deny[msg] {
+deny contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_storage_account"
   rc.change.actions[_] == "create"
@@ -19,7 +22,7 @@ deny[msg] {
 }
 
 # ── DENY: Public blob access must be disabled ─────────────────────────────────
-deny[msg] {
+deny contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_storage_account"
   rc.change.actions[_] == "create"
@@ -28,7 +31,7 @@ deny[msg] {
 }
 
 # ── DENY: Required tags missing ──────────────────────────────────────────────
-deny[msg] {
+deny contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_storage_account"
   rc.change.actions[_] == "create"
@@ -39,7 +42,7 @@ deny[msg] {
 }
 
 # ── WARN: Shared access key should be disabled ────────────────────────────────
-warn[msg] {
+warn contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_storage_account"
   rc.change.actions[_] == "create"
@@ -48,7 +51,7 @@ warn[msg] {
 }
 
 # ── WARN: LRS replication ─────────────────────────────────────────────────────
-warn[msg] {
+warn contains msg if {
   rc := input.resource_changes[_]
   rc.type == "azurerm_storage_account"
   rc.change.actions[_] == "create"
