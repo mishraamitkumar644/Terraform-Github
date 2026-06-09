@@ -7,7 +7,7 @@ terraform {
   required_version = "~> 1.7"
 
   required_providers {
-    storage_use_azuread = true
+   
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
