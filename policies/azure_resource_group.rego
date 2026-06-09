@@ -1,35 +1,35 @@
-# ============================================================
-# policies/azure_resource_group.rego
-# OPA policy for Azure Resource Group Terraform resources
-# ============================================================
-
 package terraform
 
-import future.keywords.in
 import future.keywords.if
+import future.keywords.in
 
-# ── Helper ─────────────────────────────────────────────────
+# ── Helper: collect all resource_group resources from plan ───────────────────
 resource_groups[resource] if {
   resource := input.resource_changes[_]
   resource.type == "azurerm_resource_group"
   resource.change.actions[_] in ["create", "update"]
 }
 
-# ── DENY: Tags required on RG ──────────────────────────────
-required_rg_tags := {"Environment", "Project", "ManagedBy"}
-
+# ── DENY: Required tags missing ──────────────────────────────────────────────
 deny[msg] if {
   rg := resource_groups[_]
-  missing := required_rg_tags - {k | rg.change.after.tags[k]}
-  count(missing) > 0
-  msg := sprintf("DENY [D7] Resource Group '%s': missing required tags: %v", [rg.address, missing])
+  required_tags := ["environment", "project", "owner"]
+  tag := required_tags[_]
+  not rg.change.after.tags[tag]
+  msg := sprintf(
+    "Resource Group '%s' is missing required tag: '%s'",
+    [rg.address, tag]
+  )
 }
 
-# ── DENY: Location must be an approved region ──────────────
-approved_locations := {"eastus", "westus2", "northeurope", "westeurope"}
-
+# ── DENY: Location must be approved ──────────────────────────────────────────
 deny[msg] if {
   rg := resource_groups[_]
-  not approved_locations[lower(rg.change.after.location)]
-  msg := sprintf("DENY [D8] Resource Group '%s': location '%s' is not in approved list: %v", [rg.address, rg.change.after.location, approved_locations])
+  approved_locations := ["eastus", "eastus2", "westus2", "westeurope", "northeurope"]
+  location := rg.change.after.location
+  not location in approved_locations
+  msg := sprintf(
+    "Resource Group '%s' uses unapproved location '%s'. Approved: %v",
+    [rg.address, location, approved_locations]
+  )
 }
